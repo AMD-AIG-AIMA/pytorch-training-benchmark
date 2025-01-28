@@ -89,13 +89,16 @@ class Attention(nn.Module):
         k = k.unflatten(-1, [-1, self.head_dim]).transpose(1, 2)
         v = v.unflatten(-1, [-1, self.head_dim]).transpose(1, 2)
         q, k = apply_rotary_emb(q, k, position_encoding)
-        q = q.transpose(1, 2).contiguous()
-        k = k.transpose(1, 2).contiguous()
-        v = v.transpose(1, 2).contiguous()
+
         
         if self.use_sdpa:
+            k = k.repeat_interleave(self.embedding_dim//self.kv_dim,1)
+            v = v.repeat_interleave(self.embedding_dim//self.kv_dim,1)
             o = F.scaled_dot_product_attention(q,k,v,dropout_p=0, is_causal=True)
         else:
+            q = q.transpose(1, 2).contiguous()
+            k = k.transpose(1, 2).contiguous()
+            v = v.transpose(1, 2).contiguous()
             o = flash_attn_func(q,k,v,dropout_p=0, causal=True)
 
         o = self.out_proj(o.reshape(input.shape))
