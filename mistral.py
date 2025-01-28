@@ -113,16 +113,13 @@ class MistralAttention(nn.Module):
         v = v.unflatten(-1, [-1, self.head_dim]).transpose(1, 2)
 
         q, k = apply_rotary_emb(q, k, freqs_cis=position_encoding)
-        
-        #q = apply_rotary_embd(q, position_encoding)
-        #k = apply_rotary_embd(k, position_encoding)
 
         k = k.repeat_interleave(self.embedding_dim//self.kv_dim, 1)
         v = v.repeat_interleave(self.embedding_dim//self.kv_dim, 1)
 
         if self.use_flex:
-            o_BHTD = self.sdpa(q, k, v, block_mask=self.blk_mask)
-            y_BTE = self.o_proj(o_BHTD.transpose(1, 2).flatten(-2))
+            o = self.sdpa(q, k, v, block_mask=self.blk_mask)
+            out = self.o_proj(o.transpose(1, 2).flatten(-2))
         else:
             qkv = torch.stack([q, k, v], dim=2)
             qkv_t = qkv.transpose(-2, 1)
@@ -139,37 +136,23 @@ def apply_rotary_emb(
     xq_ = torch.view_as_complex(xq.float().reshape(*xq.shape[:-1], -1, 2))
     xk_ = torch.view_as_complex(xk.float().reshape(*xk.shape[:-1], -1, 2))
     
-    #freqs_cis = freqs_cis[:, None, :]
     freqs_cis = freqs_cis[None, None, :, :]
 
     xq_out = torch.view_as_real(xq_ * freqs_cis).flatten(3)
     xk_out = torch.view_as_real(xk_ * freqs_cis).flatten(3)
     return xq_out.type_as(xq), xk_out.type_as(xk)
 
-def apply_rotary_embd(x_BXTD, freq_cis_TFC):
-     x_BXTFC = x_BXTD.unflatten(-1, [-1, 2])  # C: Complex number dimension
-     freq_cis_BXTFC = freq_cis_TFC.expand_as(x_BXTFC)
-
-     out_BXTDC = torch.stack([
-         x_BXTFC[..., 0] * freq_cis_BXTFC[..., 0] - x_BXTFC[..., 1] * freq_cis_BXTFC[..., 1],
-         x_BXTFC[..., 1] * freq_cis_BXTFC[..., 0] + x_BXTFC[..., 0] * freq_cis_BXTFC[..., 1],
-     ], dim=-1)
-     out_BXTD = out_BXTDC.flatten(-2)
-
-     return out_BXTD.type_as(x_BXTD)
-
-
 @lru_cache
 def create_block_mask_cached(window_size, max_seq_len):
-    def swa_mask_mod(b, h, q_idx, kv_idx):
+    def mask_mod(b, h, q_idx, kv_idx):
         causal_mask = (q_idx >= kv_idx)
-        window_mask = (q_idx - kv_idx <= window_size)  # (window_size + 1) kv per q unmasked
+        window_mask = (q_idx - kv_idx <= window_size)
         return causal_mask & window_mask
-    blk_mask = create_block_mask(swa_mask_mod, 1, 1, max_seq_len, max_seq_len, device='cuda')
+    blk_mask = create_block_mask(mask_mod, 1, 1, max_seq_len, max_seq_len, device='cuda')
     return blk_mask
 
 
-class SwiGLU(nn.Module):
+class FeedForward(nn.Module):
     def __init__(self, embedding_dim, hidden_dim):
         super().__init__()
         self.up_proj = nn.Linear(embedding_dim, hidden_dim, bias=False)
@@ -200,7 +183,7 @@ class MistralBlock(nn.Module):
         self.attn_norm = RMSNorm(embedding_dim, eps)
         self.attn = MistralAttention(embedding_dim, num_heads, num_kv_heads, window_size, max_seq_len)
         self.ffn_norm = RMSNorm(embedding_dim, eps)
-        self.ffn = SwiGLU(embedding_dim, hidden_dim)
+        self.ffn = FeedForward(embedding_dim, hidden_dim)
 
     def forward(self, x, freq_cis):
         h = x + self.attn(self.attn_norm(x), freq_cis)
@@ -218,11 +201,8 @@ class Mistral(nn.Module):
         self.norm = RMSNorm(embedding_dim, eps)
         self.lm_head = nn.Linear(embedding_dim, vocab_size, bias=False)
         freqs = precompute_freqs_cis(embedding_dim//num_heads, max_seq_len)
-        self.register_buffer('position_encoding', freqs.to(self.lm_head.weight.dtype))
-        if not torch.cuda.is_available() or 'MI3' in torch.cuda.get_device_name():
-            self.register_buffer('mask', create_sliding_window_attention_mask(window_size, max_seq_len))
-        else:
-            self.mask = None
+        self.register_buffer('position_encoding', freqs)
+        self.mask = None
 
     def forward(self, idx, **kwargs):
         x = self.tok_embedding(idx)
@@ -236,14 +216,6 @@ def precompute_freqs_cis(dim, end, theta: float = 1e4) -> torch.Tensor:
     t = torch.arange(end, device=freqs.device)  # type: ignore
     freqs = torch.outer(t, freqs).float()  # type: ignore
     return torch.polar(torch.ones_like(freqs), freqs)  # complex64
-
-
-def create_sliding_window_attention_mask(window_size, max_seq_len):
-    q_idx = torch.arange(max_seq_len).unsqueeze(1)   # [T, 1]
-    kv_idx = torch.arange(max_seq_len).unsqueeze(0)  # [1, T]
-    causal_mask = (q_idx >= kv_idx)
-    window_mask = (q_idx - kv_idx < window_size)
-    return causal_mask & window_mask
 
 
 class Fp8Mistral(nn.Module):
