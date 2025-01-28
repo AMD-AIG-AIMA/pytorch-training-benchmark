@@ -3,7 +3,7 @@
   "num_heads": 32,
   "num_kv_heads": 8,
   "embedding_dim": 4096,
-  "max_seq_len": 8192,
+  "max_seq_len": 4096,
   "vocab_size": 128256,
   "eps": 1e-05,
   "hidden_dim": 14336
