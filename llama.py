@@ -80,6 +80,7 @@ class Attention(nn.Module):
         self.kv_dim = embedding_dim * num_kv_heads // num_heads 
         self.in_proj = nn.Linear(embedding_dim, embedding_dim+2*self.kv_dim, bias=False)
         self.out_proj = nn.Linear(embedding_dim, embedding_dim, bias=False)
+        self.use_sdpa = torch.cuda.is_available() and 'MI3' not in torch.cuda.get_device_name() 
     
     def forward(self,input,position_encoding):
         qkv = self.in_proj(input)
@@ -91,8 +92,12 @@ class Attention(nn.Module):
         q = q.transpose(1, 2).contiguous()
         k = k.transpose(1, 2).contiguous()
         v = v.transpose(1, 2).contiguous()
+        
+        if self.use_sdpa:
+            o = F.scaled_dot_product_attention(q,k,v,dropout_p=0, is_causal=True)
+        else:
+            o = flash_attn_func(q,k,v,dropout_p=0, causal=True)
 
-        o = flash_attn_func(q,k,v,dropout_p=0, causal=True)
         o = self.out_proj(o.reshape(input.shape))
         return o
 
@@ -155,7 +160,7 @@ class LLaMA(nn.Module):
         self.num_heads = num_heads
         self.max_seq_len = max_seq_len
         freqs = precompute_freq_cis(embedding_dim//num_heads,max_seq_len)
-        self.register_buffer('position_encoding', freqs.to(torch.bfloat16))
+        self.register_buffer('position_encoding', freqs)
 
     def forward(self, idxs, is_first_microbatch):
         x = self.embedding(idxs)
