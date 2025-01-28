@@ -89,23 +89,20 @@ class MistralAttention(nn.Module):
         self.embedding_dim = embedding_dim
         self.head_dim = embedding_dim // num_heads
         self.kv_dim = num_kv_heads * embedding_dim // num_heads
+        self.repeat = self.embedding_dim//self.kv_dim
 
-        # self.q_proj = nn.Linear(embedding_dim, num_heads * self.head_dim, bias=False)
-        # self.k_proj = nn.Linear(embedding_dim, num_kv_heads * self.head_dim, bias=False)
-        # self.v_proj = nn.Linear(embedding_dim, num_kv_heads * self.head_dim, bias=False)
         self.in_proj = nn.Linear(embedding_dim, embedding_dim+2*self.kv_dim, bias=False)
 
         self.o_proj = nn.Linear(num_heads * self.head_dim, embedding_dim, bias=False)
 
-        self.use_flex = torch.cuda.is_available() and 'MI3' not in torch.cuda.get_device_name() 
-        if self.use_flex:
+        self.use_flex_attn = torch.cuda.is_available() and torch.cuda.get_device_name() in ['H100', 'H200']
+        if self.use_flex_attn:
             self.sdpa = torch.compile(flex_attention, dynamic=False)
             self.blk_mask = blk_mask = create_block_mask_cached(window_size, max_seq_len)
         else:
             self.self_attn = FlashSelfAttention(attention_dropout=0.0, window_size=(window_size-1,0))
 
     def forward(self, input, position_encoding):
-        # q, k, v = self.q_proj(input), self.k_proj(input), self.v_proj(input)
         qkv = self.in_proj(input)
         q,k,v = qkv.split([self.embedding_dim, self.kv_dim, self.kv_dim], -1)
         q = q.unflatten(-1, [-1, self.head_dim]).transpose(1, 2)
@@ -114,10 +111,10 @@ class MistralAttention(nn.Module):
 
         q, k = apply_rotary_emb(q, k, freqs_cis=position_encoding)
 
-        k = k.repeat_interleave(self.embedding_dim//self.kv_dim, 1)
-        v = v.repeat_interleave(self.embedding_dim//self.kv_dim, 1)
+        k = k.repeat_interleave(self.repeat, 1)
+        v = v.repeat_interleave(self.repeat, 1)
 
-        if self.use_flex:
+        if self.use_flex_attn:
             o = self.sdpa(q, k, v, block_mask=self.blk_mask)
             out = self.o_proj(o.transpose(1, 2).flatten(-2))
         else:
@@ -230,7 +227,7 @@ class Fp8Mistral(nn.Module):
             normalization='RMSNorm', eps=eps
         )
         position_encoding = te.attention.RotaryPositionEmbedding(embedding_dim//num_heads)(max_seq_len=max_seq_len)
-        self.register_buffer('position_encoding', position_encoding.to(torch.bfloat16))
+        self.register_buffer('position_encoding', position_encoding)
 
     def forward(self, idx, is_first_microbatch):
         x = self.tok_embedding(idx)
@@ -248,7 +245,7 @@ class Fp8MistralBlock(te.TransformerLayer):
             num_gqa_groups=num_heads//num_kv_heads,
             fuse_qkv_params=True,
             attn_input_format='bshd',
-            self_attn_mask_type='causal',  # attn mask is ignored if not set
+            self_attn_mask_type='causal',
             window_size=(window_size, 0),
             attention_dropout=0.0,
             normalization='RMSNorm',
