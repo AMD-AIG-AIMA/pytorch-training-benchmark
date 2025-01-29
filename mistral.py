@@ -3,24 +3,24 @@ from functools import lru_cache
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import transformer_engine.pytorch as te
 from pydantic.dataclasses import dataclass
+from transformer_engine.pytorch import TransformerLayer, LayerNormLinear
+from transformer_engine.pytorch.attention import RotaryPositionEmbedding
 
-from torch.nn.attention.flex_attention import create_block_mask
-from torch.nn.attention.flex_attention import flex_attention
+from torch.nn.attention.flex_attention import create_block_mask, flex_attention
 from flash_attn.modules.mha import FlashSelfAttention  
 
 
 @dataclass
 class MistralConfig:
-    num_layers: int    # L
-    num_heads: int     # H
-    num_kv_heads: int  # J
-    embedding_dim: int      # E
-    hidden_dim: int       # K
-    vocab_size: int  # V
-    max_seq_len: int # T
-    window_size: int # W
+    num_layers: int  
+    num_heads: int   
+    num_kv_heads: int 
+    embedding_dim: int      
+    hidden_dim: int       
+    vocab_size: int  
+    max_seq_len: int 
+    window_size: int
     eps: float
     arch_name: str = 'mistral'
 
@@ -98,7 +98,7 @@ class MistralAttention(nn.Module):
         self.use_flex_attn = torch.cuda.is_available() and torch.cuda.get_device_name() in ['H100', 'H200']
         if self.use_flex_attn:
             self.sdpa = torch.compile(flex_attention, dynamic=False)
-            self.blk_mask = blk_mask = create_block_mask_cached(window_size, max_seq_len)
+            self.block_mask = block_mask = create_cached_block_mask(window_size, max_seq_len)
         else:
             self.self_attn = FlashSelfAttention(attention_dropout=0.0, window_size=(window_size-1,0))
 
@@ -115,7 +115,7 @@ class MistralAttention(nn.Module):
         v = v.repeat_interleave(self.repeat, 1)
 
         if self.use_flex_attn:
-            o = self.sdpa(q, k, v, block_mask=self.blk_mask)
+            o = self.sdpa(q, k, v, block_mask=self.block_mask)
             out = self.o_proj(o.transpose(1, 2).flatten(-2))
         else:
             qkv = torch.stack([q, k, v], dim=2)
@@ -140,13 +140,13 @@ def apply_rotary_emb(
     return xq_out.type_as(xq), xk_out.type_as(xk)
 
 @lru_cache
-def create_block_mask_cached(window_size, max_seq_len):
+def create_cached_block_mask(window_size, max_seq_len):
     def mask_mod(b, h, q_idx, kv_idx):
         causal_mask = (q_idx >= kv_idx)
         window_mask = (q_idx - kv_idx <= window_size)
         return causal_mask & window_mask
-    blk_mask = create_block_mask(mask_mod, 1, 1, max_seq_len, max_seq_len, device='cuda')
-    return blk_mask
+    block_mask = create_block_mask(mask_mod, 1, 1, max_seq_len, max_seq_len, device='cuda')
+    return block_mask
 
 
 class FeedForward(nn.Module):
@@ -199,7 +199,6 @@ class Mistral(nn.Module):
         self.lm_head = nn.Linear(embedding_dim, vocab_size, bias=False)
         freqs = precompute_freqs_cis(embedding_dim//num_heads, max_seq_len)
         self.register_buffer('position_encoding', freqs)
-        self.mask = None
 
     def forward(self, idx, **kwargs):
         x = self.tok_embedding(idx)
@@ -222,11 +221,8 @@ class Fp8Mistral(nn.Module):
         self.transformer_layers = nn.ModuleList(
             Fp8MistralBlock(embedding_dim, hidden_dim, num_heads, num_kv_heads, window_size, eps) for _ in range(num_layers)
         )
-        self.lm_head_te = te.LayerNormLinear(
-            embedding_dim, vocab_size, bias=False,
-            normalization='RMSNorm', eps=eps
-        )
-        position_encoding = te.attention.RotaryPositionEmbedding(embedding_dim//num_heads)(max_seq_len=max_seq_len)
+        self.lm_head_te = LayerNormLinear(embedding_dim, vocab_size, bias=False, normalization='RMSNorm', eps=eps)
+        position_encoding = RotaryPositionEmbedding(embedding_dim//num_heads)(max_seq_len=max_seq_len)
         self.register_buffer('position_encoding', position_encoding)
 
     def forward(self, idx, is_first_microbatch):
@@ -237,7 +233,7 @@ class Fp8Mistral(nn.Module):
         return logits
 
 
-class Fp8MistralBlock(te.TransformerLayer):
+class Fp8MistralBlock(TransformerLayer):
     def __init__(self, embedding_dim, hidden_dim, num_heads, num_kv_heads, window_size, eps):
         super().__init__(
             hidden_size=embedding_dim,
