@@ -1,5 +1,10 @@
 # Training
-This code is used for benchmarking pre-training on the synthesized dataset on a single node.
+This code is used for benchmarking Pytorch based pre-training on a synthesized dataset for a single node using Torchrun utility.
+
+```
+torchrun [TORCHRUN_PARAMETERS] ./train_fsdp.py <model_config_file> <model_type>[llama/mistral] --batch-size[DEFAULT=1]
+```
+
 ## Parameters
 * **num_iteration**:
 The default setting will run the pre-training for 128 steps and use the later 64 steps to calculate the thoughput. You can change this by change num_iteration.
@@ -8,7 +13,9 @@ This will enable fp8 for training. The default setting is False.
 * **enable_compile**:
 This will enable/disable pytorch compiling. Compiling is disabled by default when using fp8 and enabled by default for bf16.
 * **batch_size**:
-This will set the batch size used for pretraining.
+This will set the batch size used for pretraining. Default is set to 1. 
+
+Listed below are some example run commands for the model benchmarked in this repository using FSDP sharding strategy on different AMD devices.
 
 ## Run commands for Mistral training with 8k sequence length
 ### MI300

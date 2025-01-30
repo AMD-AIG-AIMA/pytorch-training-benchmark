@@ -54,7 +54,7 @@ def create_dummy_data_loader(world_size, batch_size, num_iteration, model_config
 def train(
     config_file: str,
     model_name: str,
-    batch_size: int = 8,
+    batch_size: int = 1,
     num_iteration: int = 128,
     grad_accumlate_pre_steps: int = 8, # steps to accumlate gradient
     reduce_pre_steps: int = 32, # steps to do all reduce
