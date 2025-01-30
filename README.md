@@ -1,5 +1,5 @@
 # Training
-This code is used for benchmarking Pytorch based pre-training on a synthesized dataset for a single node using Torchrun utility.
+This code is used for benchmarking Pytorch based pre-training on a synthesized dataset for a single node using [Torchrun](https://pytorch.org/docs/stable/elastic/run.html) utility.
 
 ```
 torchrun [TORCHRUN_PARAMETERS] ./train_fsdp.py <model_config_file> <model_type>[llama/mistral] --batch-size[DEFAULT=1]
@@ -15,7 +15,7 @@ This will enable/disable pytorch compiling. Compiling is disabled by default whe
 * **batch_size**:
 This will set the batch size used for pretraining. Default is set to 1. 
 
-Listed below are some example run commands for the model benchmarked in this repository using FSDP sharding strategy on different AMD devices.
+Listed below are some example run commands for the model benchmarked in this repository using FSDP sharding strategy.
 
 ## Run commands for Mistral training with 8k sequence length
 ### MI300
