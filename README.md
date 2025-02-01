@@ -86,3 +86,5 @@ torchrun --nnodes=1  --node_rank=0 --nproc_per_node=8  --master_addr="0.0.0.0"  
 torchrun --nnodes=1  --node_rank=0 --nproc_per_node=8  --master_addr="0.0.0.0"     --master_port="12234"  ./train_fsdp.py \
     configs/llama-3.1-8b-8k.json llama --batch_size 5 --enable_fp8 True |& tee -a ./llama_fp8.log
 ```
+# Acknowledgment
+We acknowledge SemiAnalysis LLC, whose [benchmarking code](https://hub.docker.com/r/semianalysiswork/single-amd-vip-nov-25) served as the foundation for this setup.
