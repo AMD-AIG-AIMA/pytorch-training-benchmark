@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import transformer_engine.pytorch as te
+# import transformer_engine.pytorch as te
 
 from pydantic.dataclasses import dataclass
-from flash_attn import flash_attn_func
+from flash_attn_interface import flash_attn_func
 from torch.nn.attention import sdpa_kernel, SDPBackend    
 
 @dataclass
@@ -81,7 +81,7 @@ class Attention(nn.Module):
         self.kv_dim = embedding_dim * num_kv_heads // num_heads 
         self.in_proj = nn.Linear(embedding_dim, embedding_dim+2*self.kv_dim, bias=False)
         self.out_proj = nn.Linear(embedding_dim, embedding_dim, bias=False)
-        self.use_sdpa = torch.cuda.is_available() and 'MI3' not in torch.cuda.get_device_name() 
+        self.use_sdpa = False #torch.cuda.is_available() and 'MI3' not in torch.cuda.get_device_name() 
     
     def forward(self,input,position_encoding):
         qkv = self.in_proj(input)
@@ -93,16 +93,16 @@ class Attention(nn.Module):
 
         
         if self.use_sdpa:
-            # k = k.repeat_interleave(self.embedding_dim//self.kv_dim,1)
-            # v = v.repeat_interleave(self.embedding_dim//self.kv_dim,1)
+            #k = k.repeat_interleave(self.embedding_dim//self.kv_dim,1)
+            #v = v.repeat_interleave(self.embedding_dim//self.kv_dim,1)
             with sdpa_kernel(SDPBackend.CUDNN_ATTENTION):
-                o = F.scaled_dot_product_attention(q,k,v,dropout_p=0, is_causal=True, enable_gqa=True)
-            # o = F.scaled_dot_product_attention(q,k,v,dropout_p=0, is_causal=True)
+                o = F.scaled_dot_product_attention(q,k,v,dropout_p=0.0, is_causal=True, enable_gqa=True)
+            #o = F.scaled_dot_product_attention(q,k,v,dropout_p=0, is_causal=True)
         else:
             q = q.transpose(1, 2).contiguous()
             k = k.transpose(1, 2).contiguous()
             v = v.transpose(1, 2).contiguous()
-            o = flash_attn_func(q,k,v,dropout_p=0, causal=True)
+            o = flash_attn_func(q, k, v, causal=True)[0]
 
         o = self.out_proj(o.reshape(input.shape))
         return o
@@ -195,19 +195,21 @@ class Fp8LLaMA(nn.Module):
         logits = self.norm_lm_head(x)
         return logits
 
-class Fp8LLaMABlock(te.TransformerLayer):
-    def __init__(self, embedding_dim, hidden_dim, num_heads, num_kv_heads,eps):
-        super().__init__(
-            hidden_size=embedding_dim,
-            num_attention_heads=num_heads,
-            num_gqa_groups=num_heads//num_kv_heads,
-            fuse_qkv_params=True,
-            attn_input_format='bshd',
-            attention_dropout=0.0,
-            normalization='RMSNorm',
-            layernorm_epsilon=eps,
-            ffn_hidden_size=hidden_dim,
-            bias=False,
-            activation='swiglu',
-            hidden_dropout=0.0
-        )
+# class Fp8LLaMABlock(te.TransformerLayer):
+#     def __init__(self, embedding_dim, hidden_dim, num_heads, num_kv_heads,eps):
+#         super().__init__(
+#             hidden_size=embedding_dim,
+#             num_attention_heads=num_heads,
+#             num_gqa_groups=num_heads//num_kv_heads,
+#             fuse_qkv_params=True,
+#             attn_input_format='bshd',
+#             attention_dropout=0.0,
+#             normalization='RMSNorm',
+#             layernorm_epsilon=eps,
+#             ffn_hidden_size=hidden_dim,
+#             bias=False,
+#             activation='swiglu',
+#             hidden_dropout=0.0
+#         )
+
+

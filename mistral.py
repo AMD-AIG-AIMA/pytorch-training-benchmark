@@ -4,11 +4,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from pydantic.dataclasses import dataclass
-from transformer_engine.pytorch import TransformerLayer, LayerNormLinear
-from transformer_engine.pytorch.attention import RotaryPositionEmbedding
+# from transformer_engine.pytorch import TransformerLayer, LayerNormLinear
+# from transformer_engine.pytorch.attention import RotaryPositionEmbedding
 
 from torch.nn.attention.flex_attention import create_block_mask, flex_attention
-from flash_attn.modules.mha import FlashSelfAttention  
+# from flash_attn.modules.mha import FlashSelfAttention  
+from flash_attn_interface import flash_attn_func
 
 
 @dataclass
@@ -95,7 +96,7 @@ class MistralAttention(nn.Module):
 
         self.o_proj = nn.Linear(num_heads * self.head_dim, embedding_dim, bias=False)
 
-        self.use_flex_attn = torch.cuda.is_available() and 'NVIDIA' in torch.cuda.get_device_name()
+        self.use_flex_attn = torch.cuda.is_available() and torch.cuda.get_device_name() in ['H100', 'H200']
         if self.use_flex_attn:
             self.sdpa = torch.compile(flex_attention, dynamic=False)
             self.block_mask = block_mask = create_cached_block_mask(window_size, max_seq_len)
@@ -213,42 +214,4 @@ def precompute_freqs_cis(dim, end, theta: float = 1e4) -> torch.Tensor:
     freqs = torch.outer(t, freqs).float()  # type: ignore
     return torch.polar(torch.ones_like(freqs), freqs)  # complex64
 
-
-class Fp8Mistral(nn.Module):
-    def __init__(self, vocab_size, embedding_dim, hidden_dim, num_layers, num_heads, num_kv_heads, window_size, max_seq_len, eps, **kwargs):
-        super().__init__()
-        self.tok_embedding = nn.Embedding(vocab_size, embedding_dim)
-        self.transformer_layers = nn.ModuleList(
-            Fp8MistralBlock(embedding_dim, hidden_dim, num_heads, num_kv_heads, window_size, eps) for _ in range(num_layers)
-        )
-        self.lm_head_te = LayerNormLinear(embedding_dim, vocab_size, bias=False, normalization='RMSNorm', eps=eps)
-        position_encoding = RotaryPositionEmbedding(embedding_dim//num_heads)(max_seq_len=max_seq_len)
-        self.register_buffer('position_encoding', position_encoding)
-
-    def forward(self, idx, is_first_microbatch):
-        x = self.tok_embedding(idx)
-        for layer in self.transformer_layers:
-            x = layer(x, rotary_pos_emb=self.position_encoding, is_first_microbatch=is_first_microbatch)
-        logits = self.lm_head_te(x)
-        return logits
-
-
-class Fp8MistralBlock(TransformerLayer):
-    def __init__(self, embedding_dim, hidden_dim, num_heads, num_kv_heads, window_size, eps):
-        super().__init__(
-            hidden_size=embedding_dim,
-            num_attention_heads=num_heads,
-            num_gqa_groups=num_heads//num_kv_heads,
-            fuse_qkv_params=True,
-            attn_input_format='bshd',
-            self_attn_mask_type='causal',
-            window_size=(window_size, 0),
-            attention_dropout=0.0,
-            normalization='RMSNorm',
-            layernorm_epsilon=eps,
-            ffn_hidden_size=hidden_dim,
-            bias=False,
-            activation='swiglu',
-            hidden_dropout=0.0
-        )
 
