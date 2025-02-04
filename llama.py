@@ -5,6 +5,7 @@ import transformer_engine.pytorch as te
 
 from pydantic.dataclasses import dataclass
 from flash_attn import flash_attn_func
+from torch.nn.attention import sdpa_kernel, SDPBackend    
 
 @dataclass
 class LLaMAConfig:
@@ -92,9 +93,11 @@ class Attention(nn.Module):
 
         
         if self.use_sdpa:
-            k = k.repeat_interleave(self.embedding_dim//self.kv_dim,1)
-            v = v.repeat_interleave(self.embedding_dim//self.kv_dim,1)
-            o = F.scaled_dot_product_attention(q,k,v,dropout_p=0, is_causal=True)
+            # k = k.repeat_interleave(self.embedding_dim//self.kv_dim,1)
+            # v = v.repeat_interleave(self.embedding_dim//self.kv_dim,1)
+            with sdpa_kernel(SDPBackend.CUDNN_ATTENTION):
+                o = F.scaled_dot_product_attention(q,k,v,dropout_p=0, is_causal=True, enable_gqa=True)
+            # o = F.scaled_dot_product_attention(q,k,v,dropout_p=0, is_causal=True)
         else:
             q = q.transpose(1, 2).contiguous()
             k = k.transpose(1, 2).contiguous()

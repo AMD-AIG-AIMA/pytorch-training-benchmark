@@ -95,7 +95,7 @@ class MistralAttention(nn.Module):
 
         self.o_proj = nn.Linear(num_heads * self.head_dim, embedding_dim, bias=False)
 
-        self.use_flex_attn = torch.cuda.is_available() and torch.cuda.get_device_name() in ['H100', 'H200']
+        self.use_flex_attn = torch.cuda.is_available() and 'NVIDIA' in torch.cuda.get_device_name()
         if self.use_flex_attn:
             self.sdpa = torch.compile(flex_attention, dynamic=False)
             self.block_mask = block_mask = create_cached_block_mask(window_size, max_seq_len)
