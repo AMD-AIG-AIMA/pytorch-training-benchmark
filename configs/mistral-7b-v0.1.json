@@ -4,7 +4,7 @@
   "num_kv_heads": 8,
   "embedding_dim": 4096,
   "hidden_dim": 14336,
-  "vocab_size": 32000,
+  "vocab_size": 128256,
   "max_seq_len": 8192,
   "window_size": 1024,
   "rope_base": 10000.0,

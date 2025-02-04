@@ -9,6 +9,7 @@ from functools import partial
 from llama import LLaMAConfig, LLaMA, LLaMABlock, Fp8LLaMA, Fp8LLaMABlock
 from mistral import MistralConfig, Mistral, MistralBlock, Fp8Mistral, Fp8MistralBlock
 
+from torch.utils.data import Dataset
 import torch
 import torch.nn.functional as F
 import torch.distributed as dist
@@ -20,10 +21,25 @@ from torch.distributed.fsdp import (
 
 from torch.utils.data import DataLoader,IterableDataset
 from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
+from torch.utils.tensorboard import SummaryWriter
 
 import transformer_engine.pytorch as te
 from transformer_engine.common.recipe import Format, DelayedScaling
 from transformer_engine.pytorch.distributed import prepare_te_modules_for_fsdp
+from datasets import load_dataset
+from transformers import AutoTokenizer
+
+
+def all_reduce_mean(x):
+    world_size = dist.get_world_size()
+    if world_size > 1:
+        x_reduce = torch.tensor(x).cuda()
+        dist.all_reduce(x_reduce)
+        x_reduce /= world_size
+        return x_reduce.item()
+    else:
+        return x
+
 
 class RandData(IterableDataset):
     def __init__(self, vocab_size, max_seq_len, total_size):
@@ -43,8 +59,38 @@ class RandData(IterableDataset):
             datas.append((input,label))
         return iter(datas)
 
-def create_dummy_data_loader(world_size, batch_size, num_iteration, model_config):
-    dataset = RandData(model_config.vocab_size, model_config.max_seq_len, batch_size*num_iteration*world_size)
+class TinyTextbooksDataset(Dataset):
+    def __init__(self, max_seq_len, tokenizer=None):
+        super().__init__()
+        processed_dataset = load_dataset("/home/guihonli/project/data/tiny-textbooks", split="train")  # Load dataset
+        if tokenizer is None:
+            tokenizer = AutoTokenizer.from_pretrained("/home/guihonli/project/checkpoint/llama3-8b")  # Replace with your tokenizer
+            tokenizer.pad_token = tokenizer.eos_token
+        self.dataset = processed_dataset
+        self.tokenizer = tokenizer
+        self.max_seq_len = max_seq_len
+
+    def __getitem__(self, idx):
+        # Extract the text field from the dataset
+        example = self.dataset[idx]
+        input_text = example["text"]  # Modify if the field name differs
+
+        # Tokenize and truncate/pad the input
+        tokenized = self.tokenizer(input_text, max_length=self.max_seq_len, truncation=True, padding="max_length")
+        input_ids = torch.tensor(tokenized["input_ids"], dtype=torch.long)
+        labels = torch.cat([input_ids[1:], torch.tensor([0])])  # Shift input IDs for labels
+        
+        return input_ids, labels
+
+    def __len__(self):
+        return len(self.dataset)
+
+def create_data_loader(world_size, batch_size, num_iteration, model_config, use_dummy=True):
+    if use_dummy:
+        dataset = RandData(model_config.vocab_size, model_config.max_seq_len, batch_size*num_iteration*world_size)
+    else:
+        dataset = TinyTextbooksDataset(model_config.max_seq_len)
+
     data_loader = DataLoader(
         dataset, batch_size=batch_size,
         num_workers=world_size, pin_memory=True, shuffle=False
@@ -54,13 +100,15 @@ def create_dummy_data_loader(world_size, batch_size, num_iteration, model_config
 def train(
     config_file: str,
     model_name: str,
-    batch_size: int = 1,
-    num_iteration: int = 128,
+    batch_size: int = 8,
+    num_iteration: int = 64,
     grad_accumlate_pre_steps: int = 8, # steps to accumlate gradient
     reduce_pre_steps: int = 32, # steps to do all reduce
     enable_fp8: bool = False,
     enable_compile: bool = True,
-    seed: int = 1024 # to ensure reproducible
+    seed: int = 1024, # to ensure reproducible
+    num_epochs: int = 10,
+    dummy_data: bool = True,
 ):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
@@ -152,47 +200,62 @@ def train(
     iter_times = []
     warm_up = num_iteration/2
 
-    data_loader = create_dummy_data_loader(world_size, batch_size, num_iteration, model_config)
+    data_loader = create_data_loader(world_size, batch_size, num_iteration, model_config, use_dummy=dummy_data)
     last_time = time.time()
-    
-    for step_idx, data_batch in enumerate(data_loader):
-        input, labels = data_batch
-        input = input.to(local_rank)
-        labels = labels.to(local_rank)
-        fp8_context =  nullcontext() if not enable_fp8 else te.fp8_autocast(enabled=enable_fp8, fp8_recipe=fp8_recipe, fp8_group=all_worker)
-        with torch.amp.autocast('cuda', torch.bfloat16), fp8_context:
-            weight_cache = enable_fp8 and (step_idx % grad_accumlate_pre_steps == 0)
-            logits = model(input, is_first_microbatch=weight_cache)
-            loss = F.cross_entropy(logits.flatten(0, 1), labels.flatten())
-            loss /= grad_accumlate_pre_steps
 
-        loss.backward()
-        ddp_loss[0] += loss.item()
-        ddp_loss[1] += input.size(0)
+    device_name = torch.cuda.get_device_name().replace(' ','')
+    output_dir = '{}_{}_{}_bsz_{}'.format(device_name, model_name, 'FP8' if enable_fp8 else 'BF16', batch_size)
+    if local_rank == 0 and output_dir is not None:
+        os.makedirs(output_dir, exist_ok=True)
+        log_writer = SummaryWriter(log_dir=output_dir)
 
-        if (step_idx + 1) % grad_accumlate_pre_steps == 0:
-            # https://github.com/foundation-model-stack/fms-fsdp/blob/0fdb43dcfd31ab093f8d873b58b0b531dd0818b1/fms_fsdp/utils/train_utils.py#L94
-            # https://github.com/foundation-model-stack/foundation-model-stack/blob/d55a9f2ade65ef4157cdfd928300874e2348e5d0/fms/training/trainer.py#L36
-            model.clip_grad_norm_(1.0)
-            optimizer.step()
-            scheduler.step()
-            optimizer.zero_grad(set_to_none=True)
+    total_step = 0
+    for _ in range(num_epochs):
+        for step_idx, data_batch in enumerate(data_loader):
+            input, labels = data_batch
+            input = input.to(local_rank)
+            labels = labels.to(local_rank)
+            fp8_context =  nullcontext() if not enable_fp8 else te.fp8_autocast(enabled=enable_fp8, fp8_recipe=fp8_recipe, fp8_group=all_worker)
+            with torch.amp.autocast('cuda', torch.bfloat16), fp8_context:
+                weight_cache = enable_fp8 and (step_idx % grad_accumlate_pre_steps == 0)
+                logits = model(input, is_first_microbatch=weight_cache)
+                loss = F.cross_entropy(logits.flatten(0, 1), labels.flatten())
+                loss /= grad_accumlate_pre_steps
 
-        if (step_idx + 1) % reduce_pre_steps == 0:
-            dist.all_reduce(ddp_loss, op=dist.ReduceOp.SUM)
+            loss.backward()
+            ddp_loss[0] += loss.item()
+            ddp_loss[1] += input.size(0)
 
-        if rank == 0:
-            current_time = time.time()
-            iter_time = current_time-last_time
-            token_per_sec = (batch_size * model_config.max_seq_len)/iter_time
-            if step_idx > warm_up:
-                print(f"Step: {step_idx}; TFLOP/s: {flops_per_iter/iter_time/1e12}; iteration time: {iter_time}; token per second: {token_per_sec}")
-                iter_times.append(iter_time)
-            else:
-                print(f"warming up iter: {step_idx}/{warm_up}; TFLOP/s: {flops_per_iter/iter_time/1e12}; iteration time: {iter_time}; token per second: {token_per_sec}")
-            last_time = current_time
-        
-        if (step_idx+1) == num_iteration:
+            loss_value_reduce = all_reduce_mean(loss.item())
+            if local_rank==0:
+                print(step_idx, loss_value_reduce)
+                log_writer.add_scalar('train_loss', loss_value_reduce, total_step)
+
+            if (step_idx + 1) % grad_accumlate_pre_steps == 0:
+                # https://github.com/foundation-model-stack/fms-fsdp/blob/0fdb43dcfd31ab093f8d873b58b0b531dd0818b1/fms_fsdp/utils/train_utils.py#L94
+                # https://github.com/foundation-model-stack/foundation-model-stack/blob/d55a9f2ade65ef4157cdfd928300874e2348e5d0/fms/training/trainer.py#L36
+                model.clip_grad_norm_(1.0)
+                optimizer.step()
+                scheduler.step()
+                optimizer.zero_grad(set_to_none=True)
+
+            if (step_idx + 1) % reduce_pre_steps == 0:
+                dist.all_reduce(ddp_loss, op=dist.ReduceOp.SUM)
+
+            if rank == 0:
+                current_time = time.time()
+                iter_time = current_time-last_time
+                token_per_sec = (batch_size * model_config.max_seq_len)/iter_time
+                if step_idx > warm_up:
+                    print(f"Step: {step_idx}; TFLOP/s: {flops_per_iter/iter_time/1e12}; iteration time: {iter_time}; token per second: {token_per_sec}")
+                    iter_times.append(iter_time)
+                else:
+                    print(f"warming up iter: {step_idx}/{warm_up}; TFLOP/s: {flops_per_iter/iter_time/1e12}; iteration time: {iter_time}; token per second: {token_per_sec}")
+                last_time = current_time
+            total_step += 1
+            if total_step == num_iteration:
+                break
+        if total_step == num_iteration:
             break
 
     if rank == 0:
