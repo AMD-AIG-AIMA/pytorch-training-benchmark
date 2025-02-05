@@ -14,7 +14,7 @@ This will enable fp8 for training. The default setting is False.
 This will enable/disable pytorch compiling. Compiling is disabled by default when using fp8 and enabled by default for bf16.
 * **Real data**:
 This can enable using the real data other than mock data. To use the real data, set `--dummy_data False`.
-> Note, to access the real data, we need to add our ssh public key to the huggingface website, otherwise there is access issues. 
+  > Note, to access the real data, we need to add our ssh public key to the huggingface website, otherwise there is access issues. 
 * **batch_size**:
 This will set the batch size used for pretraining. Default is set to 1. To compare with H100/H200, we should use the same batch size as H100/H200.
 
