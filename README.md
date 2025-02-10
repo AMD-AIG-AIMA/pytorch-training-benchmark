@@ -127,7 +127,7 @@ MODEL_DIR=./models/Llama-3.1-70B-Instruct COMPILE=True CPU_OFFLOAD=False PACKED=
 ```
 
 ## Performance Result
-Result for MAX_STEPS=30 on a single node.
+Result for MAX_STEPS=30 on a single node (8 GPUs) - AMD Instinct MI300X
 ```
 Max memory alloc: 137.20211029052734
 Average tokens/s/gpu: 774.656
