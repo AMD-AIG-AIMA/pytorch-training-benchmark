@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 # sample usage: COMPILE=False MAX_STEPS=10 EPOCHS=1 SAVE_WEIGHTS=False bash wikitext_finetune.sh
