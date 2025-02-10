@@ -89,7 +89,7 @@ torchrun --nnodes=1  --node_rank=0 --nproc_per_node=8  --master_addr="0.0.0.0"  
 # Finetuning
 This section describes finetuning llama-3.1-70b using wikitext dataset on a single node using [Torchtune](https://github.com/AMD-AIG-AIMA/torchtune-private) utility.
 
-## Environment setup
+### Environment setup
 
 This installs torch 2.7.0a0+git6374332 and the torch.compile works fine within the docker.
 
@@ -120,13 +120,13 @@ cp -r ../pytorch-training-benchmark/wikitext_finetune.sh .
 cp -r ../pytorch-training-benchmark/llama_3_1_70b_full_finetune_recipe.yaml .
 ```
 
-## Finetuning Testing Command
+### Finetuning Testing Command
 The script `wikitext_finetune.sh` runs the finetuning test on llama-3.1-70b model with a wikitext dataset on top of the docker. Remove MAX_STEPS=30 if you want to run for 1 complete epoch.
 ```
 MODEL_DIR=./models/Llama-3.1-70B-Instruct COMPILE=True CPU_OFFLOAD=False PACKED=False SEQ_LEN=null ACTIVATION_CHECKPOINTING=True TUNE_ENV=True MBS=64 GAS=1 EPOCHS=1 SEED=42 VALIDATE=True MAX_STEPS=30 bash wikitext_finetune.sh
 ```
 
-## Performance Result
+### Performance Result
 Result for MAX_STEPS=30 on a single node (8 GPUs) - AMD Instinct MI300X
 ```
 Max memory alloc: 137.20211029052734
