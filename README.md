@@ -89,5 +89,28 @@ torchrun --nnodes=1  --node_rank=0 --nproc_per_node=8  --master_addr="0.0.0.0"  
 # Finetuning
 This section describes finetuning llama-3.1-70b using wikitext dataset on a single node using [Torchtune](https://github.com/AMD-AIG-AIMA/torchtune-private) utility.
 
+## Environment setup
+
+This installs torch 2.5.0.  2.5.1 is probably also fine, but we haven't thoroughly tested it. The torch 2.6.0 nightlies fix torch.compile errors, but the validation loss is very high for some reason, we're still looking into it.
+
+```bash
+docker run -it --device /dev/dri --device /dev/kfd --network host --ipc host --group-add video --cap-add SYS_PTRACE --security-opt seccomp=unconfined --privileged    -v  $HOME/.ssh:/root/.ssh  -v /home/amd:/home/amd --shm-size 128G --name YOUR_NAME_HERE rocm/pytorch-training-private:20250207![image](https://github.com/user-attachments/assets/5b2391fd-6e59-4b49-81ba-5a7cd7a1ca11)
+
+pip3 install torchao --index-url https://download.pytorch.org/whl/nightly/rocm6.3
+
+git clone https://github.com/AMD-AIG-AIMA/torchtune-private
+
+cd torchtune-private
+
+pip install -e .
+
+# if you don't have access to this model, see the section below for an alternative source.
+# but for formal testing we should use the correct model, not the unofficial mirror.
+huggingface-cli login
+huggingface-cli download meta-llama/Llama-3.1-70B-Instruct --local-dir ./models/Llama-3.1-70B-Instruct --exclude 'original/*.pth'
+
+# copy the scripts and test data into place in the torchtune dir.
+
+
 # Acknowledgment
 We acknowledge SemiAnalysis LLC, whose [benchmarking code](https://hub.docker.com/r/semianalysiswork/single-amd-vip-nov-25) served as the foundation for this setup.
