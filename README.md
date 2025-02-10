@@ -108,9 +108,8 @@ pip install -e .
 # but for formal testing we should use the correct model, not the unofficial mirror.
 huggingface-cli login
 huggingface-cli download meta-llama/Llama-3.1-70B-Instruct --local-dir ./models/Llama-3.1-70B-Instruct --exclude 'original/*.pth'
+```
 
-# copy the scripts and test data into place in the torchtune dir.
 
-
-# Acknowledgment
+# Environment setup
 We acknowledge SemiAnalysis LLC, whose [benchmarking code](https://hub.docker.com/r/semianalysiswork/single-amd-vip-nov-25) served as the foundation for this setup.
