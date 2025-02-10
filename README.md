@@ -104,6 +104,9 @@ cd torchtune-private
 
 pip install -e .
 
+# To download the wikitext dataset, do (train and test splits will be saved):
+python dataset.py
+
 # if you don't have access to this model, see the section below for an alternative source.
 # but for formal testing we should use the correct model, not the unofficial mirror.
 huggingface-cli login
