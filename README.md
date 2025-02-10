@@ -91,7 +91,7 @@ This section describes finetuning llama-3.1-70b using wikitext dataset on a sing
 
 ## Environment setup
 
-This installs torch 2.5.0.  2.5.1 is probably also fine, but we haven't thoroughly tested it. The torch 2.6.0 nightlies fix torch.compile errors, but the validation loss is very high for some reason, we're still looking into it.
+This installs torch 2.7.0 and the torch.compile works fine within the docker.
 
 ```bash
 docker run -it --device /dev/dri --device /dev/kfd --network host --ipc host --group-add video --cap-add SYS_PTRACE --security-opt seccomp=unconfined --privileged    -v  $HOME/.ssh:/root/.ssh  -v /home/amd:/home/amd --shm-size 128G --name YOUR_NAME_HERE rocm/pytorch-training-private:20250207![image](https://github.com/user-attachments/assets/5b2391fd-6e59-4b49-81ba-5a7cd7a1ca11)
