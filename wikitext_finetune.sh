@@ -1,11 +1,10 @@
 #!/bin/bash
 
 # sample usage: COMPILE=False MAX_STEPS=10 EPOCHS=1 SAVE_WEIGHTS=False bash wikitext_finetune.sh
-# compile is currently working in our environment.
+# torch.compile is currently working in our environment.
 
 CONFIG="${CONFIG:-./llama_3_1_70b_full_finetune_recipe.yaml}"
 MODEL_DIR="${MODEL_DIR:-./models/Llama-3.1-70B-Instruct}"
-# NOTE: this is not the standard ag_news dataset, the column names have been changed
 TRAIN_FILE="${TRAIN_FILE:-./wikitext_train.json}"
 TEST_FILE="${TEST_FILE:-./wikitext_test.json}"
 CHECKPOINT_DIR="${CHECKPOINT_DIR:-./checkpoints}"
