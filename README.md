@@ -91,7 +91,7 @@ This section describes finetuning llama-3.1-70b using wikitext dataset on a sing
 
 ## Environment setup
 
-This installs torch 2.7.0 and the torch.compile works fine within the docker.
+This installs torch 2.7.0a0+git6374332 ![image](https://github.com/user-attachments/assets/016774a8-7dec-4197-836d-b5d0e73f3bc9) and the torch.compile works fine within the docker.
 
 ```bash
 docker run -it --device /dev/dri --device /dev/kfd --network host --ipc host --group-add video --cap-add SYS_PTRACE --security-opt seccomp=unconfined --privileged    -v  $HOME/.ssh:/root/.ssh  -v /home/amd:/home/amd --shm-size 128G --name YOUR_NAME_HERE rocm/pytorch-training-private:20250207![image](https://github.com/user-attachments/assets/5b2391fd-6e59-4b49-81ba-5a7cd7a1ca11)
@@ -124,6 +124,17 @@ cp -r ../pytorch-training-benchmark/llama_3_1_70b_full_finetune_recipe.yaml .
 The script `wikitext_finetune.sh` runs the finetuning test on llama-3.1-70b model with a wikitext dataset on top of the docker. Remove MAX_STEPS=30 if you want to run for 1 complete epoch.
 ```
 MODEL_DIR=./models/Llama-3.1-70B-Instruct COMPILE=True CPU_OFFLOAD=False PACKED=False SEQ_LEN=null ACTIVATION_CHECKPOINTING=True TUNE_ENV=True MBS=64 GAS=1 EPOCHS=1 SEED=42 VALIDATE=True MAX_STEPS=30 bash wikitext_finetune.sh
+```
+
+## Performance Result
+Result for MAX_STEPS=30 on a single node.
+```
+Max memory alloc: 137.20211029052734
+Average tokens/s/gpu: 774.656
+Unmasked tokens/s/gpu:  141.063
+Step 30 validation loss: 13.449734449386597
+![image](https://github.com/user-attachments/assets/8b0609a6-7175-4271-bcff-509cf55e685d)
+
 ```
 
 # Environment setup
