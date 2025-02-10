@@ -104,15 +104,27 @@ cd torchtune-private
 
 pip install -e .
 
-# To download the wikitext dataset, do (train and test splits will be saved):
-python dataset.py
-
 # if you don't have access to this model, see the section below for an alternative source.
 # but for formal testing we should use the correct model, not the unofficial mirror.
 huggingface-cli login
 huggingface-cli download meta-llama/Llama-3.1-70B-Instruct --local-dir ./models/Llama-3.1-70B-Instruct --exclude 'original/*.pth'
+
+# To download the wikitext dataset, do (train and test splits will be saved):
+python dataset.py
+
+# If any error downloading the data, do:
+pip install datasets
+
+# Copy both the 'wikitext_finetune.sh' and 'llama_3_1_70b_full_finetune_recipe.yaml' into the torchtune-private directory
+cp -r ../pytorch-training-benchmark/wikitext_finetune.sh .
+cp -r ../pytorch-training-benchmark/llama_3_1_70b_full_finetune_recipe.yaml .
 ```
 
+## Finetuning Testing Command
+The script `wikitext_finetune.sh` runs the finetuning test on llama-3.1-70b model with a wikitext dataset on top of the docker. Remove MAX_STEPS=30 if you want to run for 1 complete epoch.
+```
+MODEL_DIR=./models/Llama-3.1-70B-Instruct COMPILE=True CPU_OFFLOAD=False PACKED=False SEQ_LEN=null ACTIVATION_CHECKPOINTING=True TUNE_ENV=True MBS=64 GAS=1 EPOCHS=1 SEED=42 VALIDATE=True MAX_STEPS=30 bash wikitext_finetune.sh
+```
 
 # Environment setup
 We acknowledge SemiAnalysis LLC, whose [benchmarking code](https://hub.docker.com/r/semianalysiswork/single-amd-vip-nov-25) served as the foundation for this setup.
