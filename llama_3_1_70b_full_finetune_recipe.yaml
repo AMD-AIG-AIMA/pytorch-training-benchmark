@@ -19,7 +19,7 @@ tokenizer:
 dataset:
   _component_: torchtune.datasets.text_completion_dataset
   source: json
-  data_files: /workspace/torchtune-private/wikitext_train.json
+  data_files: /workspace/torchtune/wikitext_train.json
   column: input
   split: train
 seed: null
@@ -102,4 +102,3 @@ metric_logger:
 output_dir: /workspace/70b-news-full-logs
 log_every_n_steps: 1
 log_peak_memory_stats: False
-~                         
