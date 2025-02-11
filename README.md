@@ -97,6 +97,7 @@ This installs torch 2.7.0a0+git6374332 and the torch.compile works fine within t
 docker run -it --device /dev/dri --device /dev/kfd --network host --ipc host --group-add video --cap-add SYS_PTRACE --security-opt seccomp=unconfined --privileged    -v  $HOME/.ssh:/root/.ssh  -v /home/amd:/home/amd --shm-size 128G --name YOUR_NAME_HERE rocm/pytorch-training-private:20250207
 pip3 install torchao --index-url https://download.pytorch.org/whl/nightly/rocm6.3
 
+# This is the main branch
 git clone https://github.com/AMD-AIG-AIMA/torchtune.git
 
 cd torchtune
