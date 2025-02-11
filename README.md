@@ -97,9 +97,9 @@ This installs torch 2.7.0a0+git6374332 and the torch.compile works fine within t
 docker run -it --device /dev/dri --device /dev/kfd --network host --ipc host --group-add video --cap-add SYS_PTRACE --security-opt seccomp=unconfined --privileged    -v  $HOME/.ssh:/root/.ssh  -v /home/amd:/home/amd --shm-size 128G --name YOUR_NAME_HERE rocm/pytorch-training-private:20250207
 pip3 install torchao --index-url https://download.pytorch.org/whl/nightly/rocm6.3
 
-git clone https://github.com/AMD-AIG-AIMA/torchtune-private
+git clone https://github.com/AMD-AIG-AIMA/torchtune.git
 
-cd torchtune-private
+cd torchtune
 
 pip install -e .
 
@@ -114,7 +114,7 @@ python dataset.py
 # If any error downloading the data, do:
 pip install datasets
 
-# Copy both the 'wikitext_finetune.sh' and 'llama_3_1_70b_full_finetune_recipe.yaml' into the torchtune-private directory
+# Copy both the 'wikitext_finetune.sh' and 'llama_3_1_70b_full_finetune_recipe.yaml' into the torchtune directory
 cp -r ../pytorch-training-benchmark/wikitext_finetune.sh .
 cp -r ../pytorch-training-benchmark/llama_3_1_70b_full_finetune_recipe.yaml .
 ```
@@ -125,13 +125,12 @@ The script `wikitext_finetune.sh` runs the finetuning test on llama-3.1-70b mode
 MODEL_DIR=./models/Llama-3.1-70B-Instruct COMPILE=True CPU_OFFLOAD=False PACKED=False SEQ_LEN=null ACTIVATION_CHECKPOINTING=True TUNE_ENV=True MBS=64 GAS=1 EPOCHS=1 SEED=42 VALIDATE=True MAX_STEPS=30 bash wikitext_finetune.sh
 ```
 
-### Performance Result
+### Performance Result (Full Finetuning)
 Result for MAX_STEPS=30 on a single node (8 GPUs) - AMD Instinct MI300X
 ```
-Max memory alloc: 137.20211029052734
-Average tokens/s/gpu: 774.656
-Unmasked tokens/s/gpu:  141.063
-Step 30 validation loss: 13.449734449386597
+Max memory alloc: 137.2001576423645
+Average tokens/s/gpu: 92.0694
+Unmasked tokens/s/gpu:  143.333
 ```
 
 # Environment setup
