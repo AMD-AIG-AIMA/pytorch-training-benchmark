@@ -109,13 +109,13 @@ pip install -e .
 huggingface-cli login
 huggingface-cli download meta-llama/Llama-3.1-70B-Instruct --local-dir ./models/Llama-3.1-70B-Instruct --exclude 'original/*.pth'
 
-# To download the wikitext dataset, do (train and test splits will be saved):
+# To download the wikitext dataset, go to "pytorch-training-benchmark" directory and do (train and test splits will be saved):
 python dataset.py
 
 # If any error downloading the data, do:
 pip install datasets
 
-# For full finetuning
+# For full finetuning, go to "torchtune" directory and do:
 # Copy both the 'wikitext_finetune.sh' and 'llama_3_1_70b_full_finetune_recipe.yaml' into the torchtune directory
 cp -r ../pytorch-training-benchmark/wikitext_finetune.sh .
 cp -r ../pytorch-training-benchmark/llama_3_1_70b_full_finetune_recipe.yaml .
