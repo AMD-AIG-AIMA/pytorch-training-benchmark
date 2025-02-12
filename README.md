@@ -143,7 +143,7 @@ Result for `MAX_STEPS=30` on a single node (8 GPUs) - AMD Instinct MI300X:TW044
 ```
 Max memory alloc: 137.2001576423645
 Average tokens/s/gpu: 92.0694
-Unmasked tokens/s/gpu:  143.333
+Unmasked tokens/s/gpu:  145.143
 ```
 
 ### Performance Result (LORA Finetuning)
