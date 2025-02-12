@@ -120,7 +120,7 @@ pip install datasets
 cp -r ../pytorch-training-benchmark/wikitext_finetune.sh .
 cp -r ../pytorch-training-benchmark/llama_3_1_70b_full_finetune_recipe.yaml .
 
-# For LORA finetuning
+# For LORA finetuning, go to "torchtune" directory and do:
 # Copy both the 'wikitext_lora_finetune.sh' and 'llama_3_1_70b_lora_finetune_recipe.yaml' into the torchtune directory
 cp -r ../pytorch-training-benchmark/wikitext_lora_finetune.sh .
 cp -r ../pytorch-training-benchmark/llama_3_1_70b_lora_finetune_recipe.yaml .
