@@ -129,13 +129,13 @@ cp -r ../pytorch-training-benchmark/llama_3_1_70b_lora_finetune_recipe.yaml .
 ### Full Finetuning Testing Command
 The script `wikitext_finetune.sh` runs the finetuning test on `llama-3.1-70b` model with a wikitext dataset on top of the docker. Remove `MAX_STEPS=30` if you want to run for 1 complete epoch.
 ```
-MODEL_DIR=./models/Llama-3.1-70B-Instruct COMPILE=True CPU_OFFLOAD=False PACKED=False SEQ_LEN=null ACTIVATION_CHECKPOINTING=True TUNE_ENV=True MBS=64 GAS=1 EPOCHS=1 SEED=42 VALIDATE=True MAX_STEPS=30 bash wikitext_lora_finetune.sh
+MODEL_DIR=./models/Llama-3.1-70B-Instruct COMPILE=True CPU_OFFLOAD=False PACKED=False SEQ_LEN=null ACTIVATION_CHECKPOINTING=True TUNE_ENV=True MBS=64 GAS=1 EPOCHS=1 SEED=42 VALIDATE=True MAX_STEPS=30 bash wikitext_finetune.sh
 ```
 
 ### LORA Finetuning Testing Command
 The script `wikitext_finetune.sh` runs the finetuning test on `llama-3.1-70b` model with a wikitext dataset on top of the docker. Remove `MAX_STEPS=30` if you want to run for 1 complete epoch.
 ```
-MODEL_DIR=./models/Llama-3.1-70B-Instruct COMPILE=True CPU_OFFLOAD=False PACKED=False SEQ_LEN=null ACTIVATION_CHECKPOINTING=True TUNE_ENV=True MBS=64 GAS=1 EPOCHS=1 SEED=42 VALIDATE=True MAX_STEPS=30 bash wikitext_finetune.sh
+MODEL_DIR=./models/Llama-3.1-70B-Instruct COMPILE=True CPU_OFFLOAD=False PACKED=False SEQ_LEN=null ACTIVATION_CHECKPOINTING=True TUNE_ENV=True MBS=64 GAS=1 EPOCHS=1 SEED=42 VALIDATE=True MAX_STEPS=30 bash wikitext_lora_finetune.sh
 ```
 
 ### Performance Result (Full Finetuning)
