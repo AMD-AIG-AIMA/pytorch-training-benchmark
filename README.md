@@ -91,7 +91,7 @@ This section describes finetuning llama-3.1-70b using wikitext dataset on a sing
 
 ### Environment setup
 
-This installs torch '2.7.0a0+git6374332` and the torch.compile works fine within the docker.
+This installs torch 2.7.0a0+git6374332 and the torch.compile works fine within the docker.
 
 ```bash
 docker run -it --device /dev/dri --device /dev/kfd --network host --ipc host --group-add video --cap-add SYS_PTRACE --security-opt seccomp=unconfined --privileged    -v  $HOME/.ssh:/root/.ssh  -v /home/amd:/home/amd --shm-size 128G --name YOUR_NAME_HERE rocm/pytorch-training-private:20250207
@@ -139,7 +139,7 @@ MODEL_DIR=./models/Llama-3.1-70B-Instruct COMPILE=True CPU_OFFLOAD=False PACKED=
 ```
 
 ### Performance Result (Full Finetuning)
-Result for MAX_STEPS=30 on a single node (8 GPUs) - AMD Instinct MI300X
+Result for `MAX_STEPS=30` on a single node (8 GPUs) - AMD Instinct MI300X:TW044
 ```
 Max memory alloc: 137.2001576423645
 Average tokens/s/gpu: 92.0694
@@ -147,7 +147,7 @@ Unmasked tokens/s/gpu:  143.333
 ```
 
 ### Performance Result (LORA Finetuning)
-Result for MAX_STEPS=30 on a single node (8 GPUs) - AMD Instinct MI300X
+Result for `MAX_STEPS=30` on a single node (8 GPUs) - AMD Instinct MI300X:TW044
 ```
 Max memory alloc: 117.79637384414673
 Average tokens/s/gpu: 65.7681
