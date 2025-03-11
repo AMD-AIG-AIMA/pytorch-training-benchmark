@@ -87,7 +87,7 @@ torchrun --nnodes=1  --node_rank=0 --nproc_per_node=8  --master_addr="0.0.0.0"  
     configs/llama-3.1-8b-8k.json llama --batch_size 5 --enable_fp8 True |& tee -a ./llama_fp8.log
 ```
 # Finetuning
-This section describes finetuning llama-3.1-70b using wikitext dataset on a single node using [Torchtune](https://github.com/AMD-AIG-AIMA/torchtune-private) utility.
+This section describes finetuning llama-3.1-70b using wikitext dataset on a single node using [Torchtune](https://pytorch.org/torchtune/stable/index.html) utility.
 
 ### Environment setup
 
@@ -111,6 +111,8 @@ huggingface-cli download meta-llama/Llama-3.1-70B-Instruct --local-dir ./models/
 
 cd ../
 
+git clone https://github.com/AMD-AIG-AIMA/pytorch-training-benchmark.git
+
 cd pytorch-training-benchmark
 
 # To download the wikitext dataset, go to "pytorch-training-benchmark" directory and do (train and test splits will be saved):
@@ -132,6 +134,12 @@ cp -r ../pytorch-training-benchmark/llama_3_1_70b_full_finetune_recipe.yaml .
 # Copy both the 'wikitext_lora_finetune.sh' and 'llama_3_1_70b_lora_finetune_recipe.yaml' into the torchtune directory
 cp -r ../pytorch-training-benchmark/wikitext_lora_finetune.sh .
 cp -r ../pytorch-training-benchmark/llama_3_1_70b_lora_finetune_recipe.yaml .
+
+# Dataset copy to "torchtune" folder
+cp -r ../pytorch-training-benchmark/wikitext_train.json .
+cp -r ../pytorch-training-benchmark/wikitext_test.json .
+
+# Note: Finetune part of the tutorial requires 140GB of disk space for model + dataset.
 ```
 
 ### Full Finetuning Testing Command
